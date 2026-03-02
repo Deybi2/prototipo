@@ -114,7 +114,7 @@ export default function PantallaMapa() {
             {/* Mascota */}
             <div className="w-24 h-28 relative">
               <Image
-                src="/cute-kawaii-fox-mascot-with-math-symbols-japanese-.jpg"
+                src="/placeholder.jpg"
                 alt="Mascota"
                 fill
                 className="object-cover rounded-xl border-2 border-amber-200"
