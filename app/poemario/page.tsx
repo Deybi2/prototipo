@@ -7,7 +7,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -24,6 +24,7 @@ import { useAplicacion } from "@/contextos/contexto-aplicacion"
 import { usarPoemario } from "@/hooks/usar-poemario"
 import { cn } from "@/lib/utils"
 import type { Poema } from "@/tipos/poemario"
+import { MascotaInteractivaPoema } from "@/componentes/poemario/mascota-interactiva-poema"
 
 const categoriasFiltro = [
   { id: "todos", etiqueta: "Todos", color: "bg-slate-500" },
@@ -40,6 +41,8 @@ export default function PantallaPoemario() {
   const { estado } = useAplicacion()
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const tarjetaPoemaRef = useRef<HTMLDivElement | null>(null)
 
   const {
     poemasFiltrados,
@@ -104,7 +107,7 @@ export default function PantallaPoemario() {
   // Vista de detalle de poema
   if (poemaSeleccionado) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-100 to-orange-200">
+      <div className="min-h-screen bg-gradient-to-b from-amber-100 to-orange-200" onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}>
         {/* Header */}
         <header className="sticky top-0 bg-white/90 backdrop-blur-sm border-b border-amber-200 z-10">
           <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
@@ -141,12 +144,13 @@ export default function PantallaPoemario() {
 
         {/* Contenido del poema */}
         <main className="max-w-lg mx-auto px-4 py-6 pb-24">
-          <div
+          <div ref={tarjetaPoemaRef}
             className={cn(
-              "rounded-3xl p-6 shadow-xl bg-gradient-to-br",
+              "rounded-3xl p-6 shadow-xl bg-gradient-to-br relative mt-10",
               obtenerColorCategoria(poemaSeleccionado.categoria),
             )}
           >
+            <MascotaInteractivaPoema mouseX={mousePos.x} mouseY={mousePos.y} bounds={tarjetaPoemaRef.current?.getBoundingClientRect() ?? null} />
             <div className="bg-white/20 rounded-2xl p-6">
               <h2 className="font-serif text-2xl font-bold text-white text-center mb-4">
                 {poemaSeleccionado.titulo}
@@ -280,15 +284,19 @@ export default function PantallaPoemario() {
             poemasFiltrados.map((poema) => (
               <button
                 key={poema.id}
-                onClick={() =>
-                  poema.desbloqueado && setPoemaSeleccionado(poema)
-                }
-                disabled={!poema.desbloqueado}
+                onClick={() => {
+                  if (poema.desbloqueado) {
+                    setPoemaSeleccionado(poema)
+                  } else {
+                    setMensajeExito("Debes comprar este poema en la tienda")
+                    setTimeout(() => setMensajeExito(null), 2000)
+                  }
+                }}
                 className={cn(
                   "w-full text-left rounded-xl p-4 transition-all",
                   poema.desbloqueado
                     ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-md"
-                    : "bg-slate-600/50 cursor-not-allowed",
+                    : "bg-slate-600/50",
                 )}
               >
                 <div className="flex items-center justify-between">
