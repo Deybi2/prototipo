@@ -26,11 +26,12 @@ export function usarPoemario() {
 
   // Construir poemas con estado de desbloqueo del contexto global
   const poemas = useMemo<Poema[]>(() => {
+    const poemaInicialId = todosLosPoemas[0]?.id
     return todosLosPoemas.map((poema) => ({
       ...poema,
       esFavorito: favoritosLocal.includes(poema.id),
       desbloqueado:
-        poema.desbloqueado ||
+        poema.id === poemaInicialId ||
         estado.inventario.poemasDesbloqueados.includes(poema.id),
     }))
   }, [estado.inventario.poemasDesbloqueados, favoritosLocal])
@@ -67,7 +68,7 @@ export function usarPoemario() {
   const desbloquearPoema = useCallback(
     (poemaId: string): boolean => {
       const poema = todosLosPoemas.find((p) => p.id === poemaId)
-      if (!poema || poema.desbloqueado) return false
+      if (!poema || poema.id === todosLosPoemas[0]?.id) return false
       if (estado.inventario.poemasDesbloqueados.includes(poemaId)) return false
 
       const costo = poema.monedasParaDesbloquear || 0

@@ -79,6 +79,7 @@ type AccionEstado =
       payload: Partial<EstadoGlobal["configuracion"]>
     }
   | { type: "DESBLOQUEAR_LOGRO"; payload: string }
+  | { type: "COMPLETAR_FUNDAMENTO"; payload: string }
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -244,6 +245,19 @@ function reducerEstado(
         nuevasMonedas += 50
       }
 
+      const misionesActualizadas = estado.misionesDiarias.map((mision) => {
+        if (mision.completada) return mision
+        if (mision.tipo === "ejercicios") {
+          const progreso = Math.min(mision.objetivo, mision.progresoActual + 1)
+          return { ...mision, progresoActual: progreso, completada: progreso >= mision.objetivo }
+        }
+        if (mision.tipo === "perfecto" && correcto) {
+          const progreso = Math.min(mision.objetivo, mision.progresoActual + 1)
+          return { ...mision, progresoActual: progreso, completada: progreso >= mision.objetivo }
+        }
+        return mision
+      })
+
       return {
         ...estado,
         estadisticas: {
@@ -263,6 +277,25 @@ function reducerEstado(
         progreso: {
           ...estado.progreso,
           ejerciciosCompletados: nuevosEjercicios,
+        },
+        misionesDiarias: misionesActualizadas,
+      }
+    }
+
+    case "COMPLETAR_FUNDAMENTO": {
+      if (estado.progreso.fundamentosCompletados.includes(accion.payload)) {
+        return estado
+      }
+      return {
+        ...estado,
+        progreso: {
+          ...estado.progreso,
+          fundamentosCompletados: [...estado.progreso.fundamentosCompletados, accion.payload],
+        },
+        estadisticas: {
+          ...estado.estadisticas,
+          experiencia: estado.estadisticas.experiencia + 20,
+          monedas: estado.estadisticas.monedas + 10,
         },
       }
     }
@@ -505,46 +538,25 @@ function reducerEstado(
         return estado
       }
 
-      const nuevasMisiones: MisionDiaria[] = [
-        {
-          id: `mision-${Date.now()}-1`,
-          titulo: "Matematico Matutino",
-          descripcion: "Completa 5 ejercicios",
-          tipo: "ejercicios",
-          objetivo: 5,
-          progresoActual: 0,
-          completada: false,
-          recompensaXP: 50,
-          recompensaMonedas: 25,
-          fechaAsignada: new Date().toISOString(),
-        },
-        {
-          id: `mision-${Date.now()}-2`,
-          titulo: "Perfeccionista",
-          descripcion: "Responde 3 ejercicios sin errores",
-          tipo: "perfecto",
-          objetivo: 3,
-          progresoActual: 0,
-          completada: false,
-          recompensaXP: 75,
-          recompensaMonedas: 40,
-          fechaAsignada: new Date().toISOString(),
-        },
-        {
-          id: `mision-${Date.now()}-3`,
-          titulo: "Constancia",
-          descripcion: "Manten tu racha activa",
-          tipo: "racha",
-          objetivo: 1,
-          progresoActual: estado.estadisticas.rachaActual > 0 ? 1 : 0,
-          completada: estado.estadisticas.rachaActual > 0,
-          recompensaXP: 30,
-          recompensaMonedas: 15,
-          fechaAsignada: new Date().toISOString(),
-        },
+      const plantillas: Omit<MisionDiaria, "id" | "fechaAsignada" | "progresoActual" | "completada" | "reclamada">[] = [
+        { titulo: "Ronda veloz", descripcion: "Completa 4 ejercicios", tipo: "ejercicios", objetivo: 4, recompensaXP: 40, recompensaMonedas: 20 },
+        { titulo: "Precisión total", descripcion: "Responde 3 ejercicios correctos", tipo: "perfecto", objetivo: 3, recompensaXP: 60, recompensaMonedas: 30 },
+        { titulo: "Impulso de práctica", descripcion: "Completa 6 ejercicios", tipo: "ejercicios", objetivo: 6, recompensaXP: 70, recompensaMonedas: 35 },
+        { titulo: "Racha encendida", descripcion: "Mantén tu racha activa hoy", tipo: "racha", objetivo: 1, recompensaXP: 30, recompensaMonedas: 15 },
+        { titulo: "Tiempo de estudio", descripcion: "Resuelve 5 ejercicios del día", tipo: "tiempo", objetivo: 5, recompensaXP: 55, recompensaMonedas: 25 },
       ]
+      const cantidad = 3 + Math.floor(Math.random() * 3)
+      const seleccionadas = [...plantillas].sort(() => Math.random() - 0.5).slice(0, cantidad)
+      const nuevasMisiones: MisionDiaria[] = seleccionadas.map((misionBase, indice) => ({
+        ...misionBase,
+        id: `mision-${Date.now()}-${indice}`,
+        progresoActual: misionBase.tipo === "racha" && estado.estadisticas.rachaActual > 0 ? 1 : 0,
+        completada: misionBase.tipo === "racha" && estado.estadisticas.rachaActual > 0,
+        reclamada: false,
+        fechaAsignada: new Date().toISOString(),
+      }))
 
-      return { ...estado, misionesDiarias: nuevasMisiones }
+      return { ...estado, misionesDiarias: nuevasMisiones, ultimaFechaMisiones: new Date().toISOString() }
     }
 
     case "ACTUALIZAR_PROGRESO_MISION": {
@@ -567,7 +579,7 @@ function reducerEstado(
       const mision = estado.misionesDiarias.find(
         (m) => m.id === accion.payload,
       )
-      if (!mision || mision.completada) return estado
+      if (!mision || !mision.completada || mision.reclamada) return estado
       return {
         ...estado,
         estadisticas: {
@@ -577,7 +589,7 @@ function reducerEstado(
           monedas: estado.estadisticas.monedas + mision.recompensaMonedas,
         },
         misionesDiarias: estado.misionesDiarias.map((m) =>
-          m.id === accion.payload ? { ...m, completada: true } : m,
+          m.id === accion.payload ? { ...m, reclamada: true } : m,
         ),
       }
     }
@@ -681,6 +693,12 @@ export function ProveedorAplicacion({ children }: { children: ReactNode }) {
     // Guardar sesion activa
     localStorage.setItem(CLAVE_SESION_ACTIVA, estado.usuarioActual.id)
   }, [estado, cargado])
+
+
+  useEffect(() => {
+    if (!cargado) return
+    document.documentElement.classList.toggle("dark", estado.configuracion.modoNocturno)
+  }, [estado.configuracion.modoNocturno, cargado])
 
   // 3. Limpiar sesion activa al cerrar sesion
   useEffect(() => {
