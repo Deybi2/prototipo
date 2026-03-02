@@ -23,6 +23,11 @@ import {
   ESTADO_INICIAL,
   ESTADO_ADMIN,
 } from "@/tipos/estado-global"
+import {
+  obtenerSesionRemotaActiva,
+  cargarEstadoRemoto,
+  guardarEstadoRemoto,
+} from "@/lib/sincronizacion-pb"
 
 // -----------------------------------------------------------------------------
 // Tipos de Acciones
@@ -645,42 +650,33 @@ export function ProveedorAplicacion({ children }: { children: ReactNode }) {
 
   // 1. Al montar: crear admin si no existe, y restaurar sesion activa
   useEffect(() => {
-    try {
-      // Asegurar que la cuenta admin exista
-      const usuariosRaw = localStorage.getItem(CLAVE_USUARIOS)
-      const usuarios: UsuarioGuardado[] = usuariosRaw
-        ? JSON.parse(usuariosRaw)
-        : []
-      const adminExiste = usuarios.some(
-        (u) => u.email === "admin@mathverso.com",
-      )
-      if (!adminExiste) {
-        const adminUser: UsuarioGuardado = {
-          id: "admin-001",
-          email: "admin@mathverso.com",
-          nombreUsuario: "Admin",
-          nombre: "Administrador",
-          contraseña: "admin123",
-          esAdmin: true,
-          fechaRegistro: new Date().toISOString(),
+    const inicializar = async () => {
+      try {
+        const sesionRemota = await obtenerSesionRemotaActiva()
+        if (sesionRemota) {
+          const estadoRemoto = await cargarEstadoRemoto(sesionRemota.id)
+          if (estadoRemoto) {
+            dispatch({ type: "CARGAR_ESTADO", payload: { ...estadoRemoto, usuarioActual: sesionRemota } })
+            return
+          }
+          dispatch({ type: "INICIAR_SESION", payload: sesionRemota })
+          return
         }
-        usuarios.push(adminUser)
-        localStorage.setItem(CLAVE_USUARIOS, JSON.stringify(usuarios))
-      }
 
-      // Restaurar sesion activa si existe
-      const sesionId = localStorage.getItem(CLAVE_SESION_ACTIVA)
-      if (sesionId) {
-        const usuario = usuarios.find((u) => u.id === sesionId)
-        if (usuario) {
-          // dispatch INICIAR_SESION cargara el estado del usuario
-          dispatch({ type: "INICIAR_SESION", payload: usuario })
+        const usuariosRaw = localStorage.getItem(CLAVE_USUARIOS)
+        const usuarios: UsuarioGuardado[] = usuariosRaw ? JSON.parse(usuariosRaw) : []
+        const sesionId = localStorage.getItem(CLAVE_SESION_ACTIVA)
+        if (sesionId) {
+          const usuario = usuarios.find((u) => u.id === sesionId)
+          if (usuario) dispatch({ type: "INICIAR_SESION", payload: usuario })
         }
+      } catch (error) {
+        console.error("Error cargando estado:", error)
+      } finally {
+        setCargado(true)
       }
-    } catch (error) {
-      console.error("Error cargando estado:", error)
     }
-    setCargado(true)
+    void inicializar()
   }, [])
 
   // 2. Guardar estado cada vez que cambie (si hay usuario logueado)
@@ -690,8 +686,8 @@ export function ProveedorAplicacion({ children }: { children: ReactNode }) {
 
     const clave = claveEstadoUsuario(estado.usuarioActual.id)
     localStorage.setItem(clave, JSON.stringify(estado))
-    // Guardar sesion activa
     localStorage.setItem(CLAVE_SESION_ACTIVA, estado.usuarioActual.id)
+    void guardarEstadoRemoto(estado.usuarioActual.id, estado)
   }, [estado, cargado])
 
 
