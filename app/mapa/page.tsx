@@ -15,19 +15,14 @@ import { BarraSuperior } from "@/componentes/navegacion/barra-superior"
 import { BarraInferior } from "@/componentes/navegacion/barra-inferior"
 import { TarjetaCategoria } from "@/componentes/mapa/tarjeta-categoria"
 import { useAplicacion } from "@/contextos/contexto-aplicacion"
+import { useSessionGuard } from "@/hooks/use-session-guard"
 import { categoriasEjemplo } from "@/datos/categorias-ejemplo"
 import type { Categoria } from "@/tipos/dominio"
 
 export default function PantallaMapa() {
   const router = useRouter()
+  useSessionGuard()
   const { estado, dispatch } = useAplicacion()
-
-  // Redirigir si no hay usuario
-  useEffect(() => {
-    if (!estado.usuarioActual) {
-      router.push("/bienvenida")
-    }
-  }, [estado.usuarioActual, router])
 
   // Generar misiones diarias al entrar al mapa
   useEffect(() => {
@@ -114,7 +109,7 @@ export default function PantallaMapa() {
             {/* Mascota */}
             <div className="w-24 h-28 relative">
               <Image
-                src="/cute-kawaii-fox-mascot-with-math-symbols-japanese-.jpg"
+                src="/placeholder.jpg"
                 alt="Mascota"
                 fill
                 className="object-cover rounded-xl border-2 border-amber-200"

@@ -8,16 +8,22 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, BookOpen, ChevronRight, Lightbulb, Calculator, FileText } from "lucide-react"
+import { ArrowLeft, BookOpen, ChevronRight, Lightbulb, Calculator, FileText, CheckCircle2 } from "lucide-react"
 import { BarraInferior } from "@/componentes/navegacion/barra-inferior"
 import { categoriasFundamentos } from "@/datos/fundamentos-ejemplo"
 import { cn } from "@/lib/utils"
 import type { CategoriaFundamento, ConceptoFundamental } from "@/tipos/fundamentos"
+import { useAplicacion } from "@/contextos/contexto-aplicacion"
+import { useSessionGuard } from "@/hooks/use-session-guard"
 
 export default function PantallaFundamentos() {
   const router = useRouter()
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<CategoriaFundamento | null>(null)
   const [conceptoSeleccionado, setConceptoSeleccionado] = useState<ConceptoFundamental | null>(null)
+  const [respuestaQuiz, setRespuestaQuiz] = useState("")
+  const [feedbackQuiz, setFeedbackQuiz] = useState<string | null>(null)
+  useSessionGuard()
+  const { estado, dispatch } = useAplicacion()
 
   // Vista de detalle de concepto
   if (conceptoSeleccionado && categoriaSeleccionada) {
@@ -91,6 +97,27 @@ export default function PantallaFundamentos() {
               </div>
             </div>
           )}
+
+          <div className="bg-violet-50 rounded-xl p-4 shadow-sm mb-4 border border-violet-200">
+            <h2 className="font-bold text-violet-800 mb-2">Mini cuestionario rápido</h2>
+            <p className="text-sm text-violet-700 mb-2">Escribe una palabra clave del concepto para validar comprensión.</p>
+            <div className="flex gap-2">
+              <input value={respuestaQuiz} onChange={(e) => setRespuestaQuiz(e.target.value)} className="flex-1 border border-violet-200 rounded-lg px-3 py-2 text-sm" placeholder="Ejemplo: pendiente" />
+              <button
+                onClick={() => {
+                  const clave = conceptoSeleccionado.titulo.split(" ")[0].toLowerCase()
+                  const correcta = respuestaQuiz.trim().toLowerCase().includes(clave)
+                  setFeedbackQuiz(correcta ? "¡Excelente! Concepto validado." : "Intenta incluir el término principal del concepto.")
+                  if (correcta) dispatch({ type: "COMPLETAR_FUNDAMENTO", payload: conceptoSeleccionado.id })
+                }}
+                className="bg-violet-600 text-white px-3 py-2 rounded-lg text-sm"
+              >Validar</button>
+            </div>
+            {feedbackQuiz && <p className="text-xs mt-2 text-violet-700">{feedbackQuiz}</p>}
+            {estado.progreso.fundamentosCompletados.includes(conceptoSeleccionado.id) && (
+              <p className="text-xs mt-2 inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={14} /> Completado (+20 XP, +10 monedas)</p>
+            )}
+          </div>
 
           {/* Consejos */}
           {conceptoSeleccionado.consejos.length > 0 && (

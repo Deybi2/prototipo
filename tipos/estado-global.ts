@@ -36,6 +36,7 @@ export interface ProgresoGlobal {
   actividadesDesbloqueadas: string[]
   actividadesCompletadas: string[]
   ejerciciosCompletados: string[]
+  fundamentosCompletados: string[]
 }
 
 export interface MisionDiaria {
@@ -46,6 +47,7 @@ export interface MisionDiaria {
   objetivo: number
   progresoActual: number
   completada: boolean
+  reclamada: boolean
   recompensaXP: number
   recompensaMonedas: number
   fechaAsignada: string
@@ -89,6 +91,7 @@ export interface EstadoGlobal {
   misionesDiarias: MisionDiaria[]
   poemasEspeciales: PoemaEspecial[]
   configuracion: ConfiguracionApp
+  ultimaFechaMisiones: string | null
 }
 
 export interface ConfiguracionApp {
@@ -121,6 +124,7 @@ export const ESTADO_INICIAL: EstadoGlobal = {
     actividadesDesbloqueadas: ["actividad-1-1-1"],
     actividadesCompletadas: [],
     ejerciciosCompletados: [],
+    fundamentosCompletados: [],
   },
   inventario: {
     pistasDisponibles: 3,
@@ -141,6 +145,7 @@ export const ESTADO_INICIAL: EstadoGlobal = {
     sonidos: true,
     idioma: "es",
   },
+  ultimaFechaMisiones: null,
 }
 
 // Estado para admin con todo desbloqueado
@@ -167,6 +172,7 @@ export const ESTADO_ADMIN: EstadoGlobal = {
     actividadesDesbloqueadas: [],
     actividadesCompletadas: [],
     ejerciciosCompletados: [],
+    fundamentosCompletados: [],
   },
   inventario: {
     pistasDisponibles: 999,
@@ -187,4 +193,5 @@ export const ESTADO_ADMIN: EstadoGlobal = {
     sonidos: true,
     idioma: "es",
   },
+  ultimaFechaMisiones: null,
 }

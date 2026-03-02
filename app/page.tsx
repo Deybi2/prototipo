@@ -41,7 +41,7 @@ export default function PantallaCarga() {
         {/* Imagen de la mascota */}
         <div className="relative w-64 h-80 mb-6 rounded-2xl overflow-hidden shadow-lg border-4 border-amber-200">
           <Image
-            src="/cute-kawaii-fox-mascot-with-math-symbols-japanese-.jpg"
+            src="/placeholder.jpg"
             alt="Mascota de Matemáticas en Verso"
             fill
             className="object-cover"

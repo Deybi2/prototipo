@@ -7,7 +7,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -21,9 +21,11 @@ import {
 } from "lucide-react"
 import { BarraInferior } from "@/componentes/navegacion/barra-inferior"
 import { useAplicacion } from "@/contextos/contexto-aplicacion"
+import { useSessionGuard } from "@/hooks/use-session-guard"
 import { usarPoemario } from "@/hooks/usar-poemario"
 import { cn } from "@/lib/utils"
 import type { Poema } from "@/tipos/poemario"
+import { MascotaInteractivaPoema } from "@/componentes/poemario/mascota-interactiva-poema"
 
 const categoriasFiltro = [
   { id: "todos", etiqueta: "Todos", color: "bg-slate-500" },
@@ -37,9 +39,12 @@ const categoriasFiltro = [
 
 export default function PantallaPoemario() {
   const router = useRouter()
+  useSessionGuard()
   const { estado } = useAplicacion()
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const tarjetaPoemaRef = useRef<HTMLDivElement | null>(null)
 
   const {
     poemasFiltrados,
@@ -95,7 +100,7 @@ export default function PantallaPoemario() {
 
   if (cargando || !estado.usuarioActual) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-teal-600 to-teal-700 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-indigo-900 to-indigo-950 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-white border-t-transparent rounded-full" />
       </div>
     )
@@ -104,7 +109,7 @@ export default function PantallaPoemario() {
   // Vista de detalle de poema
   if (poemaSeleccionado) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-100 to-orange-200">
+      <div className="min-h-screen bg-gradient-to-b from-amber-100 to-orange-200" onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}>
         {/* Header */}
         <header className="sticky top-0 bg-white/90 backdrop-blur-sm border-b border-amber-200 z-10">
           <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
@@ -141,12 +146,13 @@ export default function PantallaPoemario() {
 
         {/* Contenido del poema */}
         <main className="max-w-lg mx-auto px-4 py-6 pb-24">
-          <div
+          <div ref={tarjetaPoemaRef}
             className={cn(
-              "rounded-3xl p-6 shadow-xl bg-gradient-to-br",
+              "rounded-3xl p-6 shadow-xl bg-gradient-to-br relative mt-10",
               obtenerColorCategoria(poemaSeleccionado.categoria),
             )}
           >
+            <MascotaInteractivaPoema mouseX={mousePos.x} mouseY={mousePos.y} bounds={tarjetaPoemaRef.current?.getBoundingClientRect() ?? null} />
             <div className="bg-white/20 rounded-2xl p-6">
               <h2 className="font-serif text-2xl font-bold text-white text-center mb-4">
                 {poemaSeleccionado.titulo}
@@ -181,9 +187,9 @@ export default function PantallaPoemario() {
 
   // Vista de lista de poemas
   return (
-    <div className="min-h-screen bg-gradient-to-b from-teal-600 to-teal-700">
+    <div className="min-h-screen bg-gradient-to-b from-indigo-900 to-indigo-950">
       {/* Header */}
-      <header className="sticky top-0 bg-teal-700/90 backdrop-blur-sm border-b border-teal-500 z-10">
+      <header className="sticky top-0 bg-indigo-950/90 backdrop-blur-sm border-b border-indigo-700 z-10">
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center justify-between mb-3">
             <button
@@ -205,11 +211,11 @@ export default function PantallaPoemario() {
                   {monedasUsuario}
                 </span>
               </div>
-              <div className="flex items-center gap-1 bg-teal-800 px-2 py-1 rounded-full">
+              <div className="flex items-center gap-1 bg-indigo-800 px-2 py-1 rounded-full">
                 <span className="text-amber-300 font-bold text-xs">
                   {estadisticas.poemasColeccionados}
                 </span>
-                <span className="text-teal-300 text-xs">
+                <span className="text-indigo-300 text-xs">
                   /{estadisticas.totalPoemas}
                 </span>
               </div>
@@ -220,7 +226,7 @@ export default function PantallaPoemario() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              className="flex items-center gap-1 bg-teal-800 px-3 py-2 rounded-lg text-white text-sm"
+              className="flex items-center gap-1 bg-indigo-800 px-3 py-2 rounded-lg text-white text-sm"
             >
               <Filter size={16} />
               Filtrar
@@ -234,8 +240,8 @@ export default function PantallaPoemario() {
                     className={cn(
                       "px-3 py-1 rounded-full text-xs whitespace-nowrap transition-colors",
                       filtroCategoria === cat.id
-                        ? "bg-white text-teal-700 font-bold"
-                        : "bg-teal-800 text-white",
+                        ? "bg-white text-indigo-700 font-bold"
+                        : "bg-indigo-800 text-white",
                     )}
                   >
                     {cat.etiqueta}
@@ -256,8 +262,8 @@ export default function PantallaPoemario() {
                   className={cn(
                     "px-3 py-2 rounded-lg text-xs transition-colors",
                     filtroCategoria === cat.id
-                      ? "bg-white text-teal-700 font-bold"
-                      : "bg-teal-800 text-white",
+                      ? "bg-white text-indigo-700 font-bold"
+                      : "bg-indigo-800 text-white",
                   )}
                 >
                   {cat.etiqueta}
@@ -273,22 +279,39 @@ export default function PantallaPoemario() {
         <div className="space-y-3">
           {poemasFiltrados.length === 0 ? (
             <div className="text-center py-12">
-              <BookOpen size={48} className="mx-auto text-teal-300 mb-4" />
+              <BookOpen size={48} className="mx-auto text-indigo-300 mb-4" />
               <p className="text-white/80">No hay poemas en esta categoria</p>
             </div>
           ) : (
             poemasFiltrados.map((poema) => (
-              <button
+              <div
                 key={poema.id}
-                onClick={() =>
-                  poema.desbloqueado && setPoemaSeleccionado(poema)
-                }
-                disabled={!poema.desbloqueado}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  if (poema.desbloqueado) {
+                    setPoemaSeleccionado(poema)
+                  } else {
+                    setMensajeExito("Debes comprar este poema en la tienda")
+                    setTimeout(() => setMensajeExito(null), 2000)
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    if (poema.desbloqueado) {
+                      setPoemaSeleccionado(poema)
+                    } else {
+                      setMensajeExito("Debes comprar este poema en la tienda")
+                      setTimeout(() => setMensajeExito(null), 2000)
+                    }
+                  }
+                }}
                 className={cn(
-                  "w-full text-left rounded-xl p-4 transition-all",
+                  "w-full text-left rounded-xl p-4 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-300",
                   poema.desbloqueado
-                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-md"
-                    : "bg-slate-600/50 cursor-not-allowed",
+                    ? "bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 shadow-md"
+                    : "bg-indigo-950/60",
                 )}
               >
                 <div className="flex items-center justify-between">
@@ -330,7 +353,7 @@ export default function PantallaPoemario() {
                     )}
                   </div>
                 </div>
-              </button>
+              </div>
             ))
           )}
         </div>

@@ -12,6 +12,7 @@ import { ArrowLeft, Trophy, Medal, Star, Flame, Crown } from "lucide-react"
 import { BarraInferior } from "@/componentes/navegacion/barra-inferior"
 import { jugadoresRankingEjemplo, rankingSemanal, rankingMensual } from "@/datos/ranking-ejemplo"
 import { cn } from "@/lib/utils"
+import { useSessionGuard } from "@/hooks/use-session-guard"
 import type { JugadorRanking } from "@/tipos/ranking"
 
 type TipoRanking = "global" | "semanal" | "mensual"
@@ -24,6 +25,7 @@ const pestanasRanking = [
 
 export default function PantallaRanking() {
   const router = useRouter()
+  useSessionGuard()
   const [tipoRanking, setTipoRanking] = useState<TipoRanking>("global")
 
   const obtenerJugadores = (): JugadorRanking[] => {

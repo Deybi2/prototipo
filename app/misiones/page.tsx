@@ -11,10 +11,12 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Target, Coins, Star, CheckCircle, Clock, Zap, Trophy, Flame, Award } from "lucide-react"
 import { BarraInferior } from "@/componentes/navegacion/barra-inferior"
 import { useAplicacion } from "@/contextos/contexto-aplicacion"
+import { useSessionGuard } from "@/hooks/use-session-guard"
 import { cn } from "@/lib/utils"
 
 export default function PantallaMisiones() {
   const router = useRouter()
+  useSessionGuard()
   const { estado, dispatch } = useAplicacion()
 
   // Redirigir si no hay usuario
@@ -35,7 +37,6 @@ export default function PantallaMisiones() {
     const mision = estado.misionesDiarias.find((m) => m.id === misionId)
     if (!mision || !mision.completada) return
 
-    // La recompensa ya se aplica en el reducer al marcar como completada
     dispatch({ type: "COMPLETAR_MISION", payload: misionId })
   }
 
@@ -73,7 +74,7 @@ export default function PantallaMisiones() {
     return null
   }
 
-  const misionesCompletadas = estado.misionesDiarias.filter((m) => m.completada).length
+  const misionesCompletadas = estado.misionesDiarias.filter((m) => m.reclamada).length
   const totalMisiones = estado.misionesDiarias.length
 
   return (
@@ -123,7 +124,7 @@ export default function PantallaMisiones() {
             <div className="flex items-center justify-center gap-1 mb-1">
               <Star size={18} className="text-amber-500" />
               <span className="font-bold text-slate-800">
-                {estado.misionesDiarias.reduce((acc, m) => acc + (m.completada ? m.recompensaXP : 0), 0)}
+                {estado.misionesDiarias.reduce((acc, m) => acc + (m.reclamada ? m.recompensaXP : 0), 0)}
               </span>
             </div>
             <p className="text-slate-500 text-xs">XP ganado hoy</p>
@@ -132,19 +133,27 @@ export default function PantallaMisiones() {
             <div className="flex items-center justify-center gap-1 mb-1">
               <Coins size={18} className="text-amber-500" />
               <span className="font-bold text-slate-800">
-                {estado.misionesDiarias.reduce((acc, m) => acc + (m.completada ? m.recompensaMonedas : 0), 0)}
+                {estado.misionesDiarias.reduce((acc, m) => acc + (m.reclamada ? m.recompensaMonedas : 0), 0)}
               </span>
             </div>
             <p className="text-slate-500 text-xs">Monedas ganadas</p>
           </div>
         </div>
 
+        {estado.misionesDiarias.length > 0 && estado.misionesDiarias.every((m) => m.reclamada) && (
+          <div className="mb-4 text-center">
+            <span className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium">
+              <CheckCircle size={14} /> Completado hoy
+            </span>
+          </div>
+        )}
+
         {/* Lista de misiones */}
         <div className="space-y-3">
           {estado.misionesDiarias.map((mision) => (
             <div
               key={mision.id}
-              className={cn("bg-white rounded-xl p-4 transition-all", mision.completada && "ring-2 ring-emerald-400")}
+              className={cn("bg-white rounded-xl p-4 transition-all", mision.reclamada && "ring-2 ring-emerald-400")}
             >
               <div className="flex items-start gap-3">
                 <div
@@ -153,14 +162,14 @@ export default function PantallaMisiones() {
                     obtenerColorFondo(mision.tipo),
                   )}
                 >
-                  {mision.completada ? (
+                  {mision.reclamada ? (
                     <CheckCircle size={24} className="text-emerald-500" />
                   ) : (
                     obtenerIconoMision(mision.tipo)
                   )}
                 </div>
                 <div className="flex-1">
-                  <h3 className={cn("font-bold text-slate-800", mision.completada && "text-emerald-600")}>
+                  <h3 className={cn("font-bold text-slate-800", mision.reclamada && "text-emerald-600")}>
                     {mision.titulo}
                   </h3>
                   <p className="text-slate-500 text-sm">{mision.descripcion}</p>
@@ -177,7 +186,7 @@ export default function PantallaMisiones() {
                       <div
                         className={cn(
                           "h-2 rounded-full transition-all duration-300",
-                          mision.completada ? "bg-emerald-500" : "bg-indigo-500",
+                          mision.reclamada ? "bg-emerald-500" : "bg-indigo-500",
                         )}
                         style={{ width: `${Math.min((mision.progresoActual / mision.objetivo) * 100, 100)}%` }}
                       />
@@ -198,7 +207,7 @@ export default function PantallaMisiones() {
                 </div>
 
                 {/* Botón de reclamar */}
-                {mision.progresoActual >= mision.objetivo && !mision.completada && (
+                {mision.progresoActual >= mision.objetivo && !mision.reclamada && (
                   <button
                     onClick={() => reclamarRecompensa(mision.id)}
                     className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1"

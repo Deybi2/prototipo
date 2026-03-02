@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { BarraInferior } from "@/componentes/navegacion/barra-inferior"
 import { useAplicacion } from "@/contextos/contexto-aplicacion"
+import { useSessionGuard } from "@/hooks/use-session-guard"
 import { cn } from "@/lib/utils"
 
 type TabTienda = "articulos" | "suscripciones"
@@ -37,7 +38,8 @@ interface ArticuloTienda {
   icono: React.ReactNode
   precioMonedas: number
   colorFondo: string
-  tipo: "pistas" | "dobleXP" | "proteccionRacha" | "fragmentoPoema" | "monedas"
+  tipo: "pistas" | "dobleXP" | "proteccionRacha" | "fragmentoPoema" | "monedas" | "poema"
+  poemaId?: string
   cantidad?: number
   duracionDias?: number
   destacado?: boolean
@@ -127,6 +129,26 @@ const articulosTiendaData: ArticuloTienda[] = [
     tipo: "monedas",
     cantidad: 200,
   },
+  {
+    id: "poema-sistemas-esperanza",
+    nombre: "Poema: Sistemas de Esperanza",
+    descripcion: "Desbloquea un poema exclusivo del poemario",
+    icono: <BookOpen size={24} className="text-rose-500" />,
+    precioMonedas: 100,
+    colorFondo: "bg-rose-100",
+    tipo: "poema",
+    poemaId: "poema-algebra-4",
+  },
+  {
+    id: "poema-circulo-perfecto",
+    nombre: "Poema: El Círculo Perfecto",
+    descripcion: "Desbloquea un poema de geometría",
+    icono: <BookOpen size={24} className="text-cyan-500" />,
+    precioMonedas: 200,
+    colorFondo: "bg-cyan-100",
+    tipo: "poema",
+    poemaId: "poema-geometria-4",
+  },
 ]
 
 const planesSuscripcionData: PlanSuscripcion[] = [
@@ -184,6 +206,7 @@ const planesSuscripcionData: PlanSuscripcion[] = [
 
 export default function PantallaTienda() {
   const router = useRouter()
+  useSessionGuard()
   const { estado, dispatch } = useAplicacion()
   const [tabActiva, setTabActiva] = useState<TabTienda>("articulos")
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
@@ -224,14 +247,16 @@ export default function PantallaTienda() {
       return
     }
 
-    if (estado.estadisticas.monedas < articulo.precioMonedas) {
+    const monedasActuales = Number(estado.estadisticas.monedas)
+    const precio = Number(articulo.precioMonedas)
+    if (monedasActuales < precio) {
       setMensajeExito("No tienes suficientes monedas")
       setTimeout(() => setMensajeExito(null), 3000)
       return
     }
 
     // Restar monedas
-    dispatch({ type: "RESTAR_MONEDAS", payload: articulo.precioMonedas })
+    dispatch({ type: "RESTAR_MONEDAS", payload: precio })
 
     // Aplicar efecto según tipo
     switch (articulo.tipo) {
@@ -248,10 +273,15 @@ export default function PantallaTienda() {
         setMensajeExito(`¡Protección de racha activada por ${articulo.duracionDias} días!`)
         break
       case "fragmentoPoema":
-        // Generar ID de fragmento aleatorio
         const fragmentoId = `fragmento-${Date.now()}`
         dispatch({ type: "DESBLOQUEAR_FRAGMENTO", payload: fragmentoId })
         setMensajeExito("¡Has desbloqueado un nuevo fragmento de poema!")
+        break
+      case "poema":
+        if (articulo.poemaId) {
+          dispatch({ type: "DESBLOQUEAR_POEMA", payload: articulo.poemaId })
+          setMensajeExito("¡Poema desbloqueado! Ya puedes abrirlo en el poemario.")
+        }
         break
     }
 

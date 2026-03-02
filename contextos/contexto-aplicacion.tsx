@@ -23,6 +23,11 @@ import {
   ESTADO_INICIAL,
   ESTADO_ADMIN,
 } from "@/tipos/estado-global"
+import {
+  obtenerSesionRemotaActiva,
+  cargarEstadoRemoto,
+  guardarEstadoRemoto,
+} from "@/lib/sincronizacion-pb"
 
 // -----------------------------------------------------------------------------
 // Tipos de Acciones
@@ -79,12 +84,12 @@ type AccionEstado =
       payload: Partial<EstadoGlobal["configuracion"]>
     }
   | { type: "DESBLOQUEAR_LOGRO"; payload: string }
+  | { type: "COMPLETAR_FUNDAMENTO"; payload: string }
 
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
 
-const CLAVE_USUARIOS = "mathverso_usuarios"
 const CLAVE_SESION_ACTIVA = "mathverso_sesion_activa"
 
 function claveEstadoUsuario(usuarioId: string): string {
@@ -244,6 +249,19 @@ function reducerEstado(
         nuevasMonedas += 50
       }
 
+      const misionesActualizadas = estado.misionesDiarias.map((mision) => {
+        if (mision.completada) return mision
+        if (mision.tipo === "ejercicios") {
+          const progreso = Math.min(mision.objetivo, mision.progresoActual + 1)
+          return { ...mision, progresoActual: progreso, completada: progreso >= mision.objetivo }
+        }
+        if (mision.tipo === "perfecto" && correcto) {
+          const progreso = Math.min(mision.objetivo, mision.progresoActual + 1)
+          return { ...mision, progresoActual: progreso, completada: progreso >= mision.objetivo }
+        }
+        return mision
+      })
+
       return {
         ...estado,
         estadisticas: {
@@ -263,6 +281,25 @@ function reducerEstado(
         progreso: {
           ...estado.progreso,
           ejerciciosCompletados: nuevosEjercicios,
+        },
+        misionesDiarias: misionesActualizadas,
+      }
+    }
+
+    case "COMPLETAR_FUNDAMENTO": {
+      if (estado.progreso.fundamentosCompletados.includes(accion.payload)) {
+        return estado
+      }
+      return {
+        ...estado,
+        progreso: {
+          ...estado.progreso,
+          fundamentosCompletados: [...estado.progreso.fundamentosCompletados, accion.payload],
+        },
+        estadisticas: {
+          ...estado.estadisticas,
+          experiencia: estado.estadisticas.experiencia + 20,
+          monedas: estado.estadisticas.monedas + 10,
         },
       }
     }
@@ -505,46 +542,25 @@ function reducerEstado(
         return estado
       }
 
-      const nuevasMisiones: MisionDiaria[] = [
-        {
-          id: `mision-${Date.now()}-1`,
-          titulo: "Matematico Matutino",
-          descripcion: "Completa 5 ejercicios",
-          tipo: "ejercicios",
-          objetivo: 5,
-          progresoActual: 0,
-          completada: false,
-          recompensaXP: 50,
-          recompensaMonedas: 25,
-          fechaAsignada: new Date().toISOString(),
-        },
-        {
-          id: `mision-${Date.now()}-2`,
-          titulo: "Perfeccionista",
-          descripcion: "Responde 3 ejercicios sin errores",
-          tipo: "perfecto",
-          objetivo: 3,
-          progresoActual: 0,
-          completada: false,
-          recompensaXP: 75,
-          recompensaMonedas: 40,
-          fechaAsignada: new Date().toISOString(),
-        },
-        {
-          id: `mision-${Date.now()}-3`,
-          titulo: "Constancia",
-          descripcion: "Manten tu racha activa",
-          tipo: "racha",
-          objetivo: 1,
-          progresoActual: estado.estadisticas.rachaActual > 0 ? 1 : 0,
-          completada: estado.estadisticas.rachaActual > 0,
-          recompensaXP: 30,
-          recompensaMonedas: 15,
-          fechaAsignada: new Date().toISOString(),
-        },
+      const plantillas: Omit<MisionDiaria, "id" | "fechaAsignada" | "progresoActual" | "completada" | "reclamada">[] = [
+        { titulo: "Ronda veloz", descripcion: "Completa 4 ejercicios", tipo: "ejercicios", objetivo: 4, recompensaXP: 40, recompensaMonedas: 20 },
+        { titulo: "Precisión total", descripcion: "Responde 3 ejercicios correctos", tipo: "perfecto", objetivo: 3, recompensaXP: 60, recompensaMonedas: 30 },
+        { titulo: "Impulso de práctica", descripcion: "Completa 6 ejercicios", tipo: "ejercicios", objetivo: 6, recompensaXP: 70, recompensaMonedas: 35 },
+        { titulo: "Racha encendida", descripcion: "Mantén tu racha activa hoy", tipo: "racha", objetivo: 1, recompensaXP: 30, recompensaMonedas: 15 },
+        { titulo: "Tiempo de estudio", descripcion: "Resuelve 5 ejercicios del día", tipo: "tiempo", objetivo: 5, recompensaXP: 55, recompensaMonedas: 25 },
       ]
+      const cantidad = 3 + Math.floor(Math.random() * 3)
+      const seleccionadas = [...plantillas].sort(() => Math.random() - 0.5).slice(0, cantidad)
+      const nuevasMisiones: MisionDiaria[] = seleccionadas.map((misionBase, indice) => ({
+        ...misionBase,
+        id: `mision-${Date.now()}-${indice}`,
+        progresoActual: misionBase.tipo === "racha" && estado.estadisticas.rachaActual > 0 ? 1 : 0,
+        completada: misionBase.tipo === "racha" && estado.estadisticas.rachaActual > 0,
+        reclamada: false,
+        fechaAsignada: new Date().toISOString(),
+      }))
 
-      return { ...estado, misionesDiarias: nuevasMisiones }
+      return { ...estado, misionesDiarias: nuevasMisiones, ultimaFechaMisiones: new Date().toISOString() }
     }
 
     case "ACTUALIZAR_PROGRESO_MISION": {
@@ -567,7 +583,7 @@ function reducerEstado(
       const mision = estado.misionesDiarias.find(
         (m) => m.id === accion.payload,
       )
-      if (!mision || mision.completada) return estado
+      if (!mision || !mision.completada || mision.reclamada) return estado
       return {
         ...estado,
         estadisticas: {
@@ -577,7 +593,7 @@ function reducerEstado(
           monedas: estado.estadisticas.monedas + mision.recompensaMonedas,
         },
         misionesDiarias: estado.misionesDiarias.map((m) =>
-          m.id === accion.payload ? { ...m, completada: true } : m,
+          m.id === accion.payload ? { ...m, reclamada: true } : m,
         ),
       }
     }
@@ -631,44 +647,29 @@ export function ProveedorAplicacion({ children }: { children: ReactNode }) {
   const [estado, dispatch] = useReducer(reducerEstado, ESTADO_INICIAL)
   const [cargado, setCargado] = useState(false)
 
-  // 1. Al montar: crear admin si no existe, y restaurar sesion activa
+  // 1. Restaurar solo sesión remota válida
   useEffect(() => {
-    try {
-      // Asegurar que la cuenta admin exista
-      const usuariosRaw = localStorage.getItem(CLAVE_USUARIOS)
-      const usuarios: UsuarioGuardado[] = usuariosRaw
-        ? JSON.parse(usuariosRaw)
-        : []
-      const adminExiste = usuarios.some(
-        (u) => u.email === "admin@mathverso.com",
-      )
-      if (!adminExiste) {
-        const adminUser: UsuarioGuardado = {
-          id: "admin-001",
-          email: "admin@mathverso.com",
-          nombreUsuario: "Admin",
-          nombre: "Administrador",
-          contraseña: "admin123",
-          esAdmin: true,
-          fechaRegistro: new Date().toISOString(),
+    const inicializar = async () => {
+      try {
+        const sesionRemota = await obtenerSesionRemotaActiva()
+        if (sesionRemota) {
+          const estadoRemoto = await cargarEstadoRemoto(sesionRemota.id)
+          if (estadoRemoto) {
+            dispatch({ type: "CARGAR_ESTADO", payload: { ...estadoRemoto, usuarioActual: sesionRemota } })
+          } else {
+            dispatch({ type: "CARGAR_ESTADO", payload: { ...ESTADO_INICIAL, usuarioActual: sesionRemota } })
+          }
+        } else {
+          dispatch({ type: "CERRAR_SESION" })
         }
-        usuarios.push(adminUser)
-        localStorage.setItem(CLAVE_USUARIOS, JSON.stringify(usuarios))
+      } catch (error) {
+        console.error("Error cargando estado:", error)
+        dispatch({ type: "CERRAR_SESION" })
+      } finally {
+        setCargado(true)
       }
-
-      // Restaurar sesion activa si existe
-      const sesionId = localStorage.getItem(CLAVE_SESION_ACTIVA)
-      if (sesionId) {
-        const usuario = usuarios.find((u) => u.id === sesionId)
-        if (usuario) {
-          // dispatch INICIAR_SESION cargara el estado del usuario
-          dispatch({ type: "INICIAR_SESION", payload: usuario })
-        }
-      }
-    } catch (error) {
-      console.error("Error cargando estado:", error)
     }
-    setCargado(true)
+    void inicializar()
   }, [])
 
   // 2. Guardar estado cada vez que cambie (si hay usuario logueado)
@@ -678,9 +679,15 @@ export function ProveedorAplicacion({ children }: { children: ReactNode }) {
 
     const clave = claveEstadoUsuario(estado.usuarioActual.id)
     localStorage.setItem(clave, JSON.stringify(estado))
-    // Guardar sesion activa
     localStorage.setItem(CLAVE_SESION_ACTIVA, estado.usuarioActual.id)
+    void guardarEstadoRemoto(estado.usuarioActual.id, estado)
   }, [estado, cargado])
+
+
+  useEffect(() => {
+    if (!cargado) return
+    document.documentElement.classList.toggle("dark", estado.configuracion.modoNocturno)
+  }, [estado.configuracion.modoNocturno, cargado])
 
   // 3. Limpiar sesion activa al cerrar sesion
   useEffect(() => {
@@ -727,54 +734,19 @@ export function useAplicacion() {
 }
 
 // -----------------------------------------------------------------------------
-// Funciones de utilidad para usuarios
+// Utilidades legacy (sin autenticación local)
 // -----------------------------------------------------------------------------
 
-export function obtenerUsuarios(): UsuarioGuardado[] {
-  if (typeof window === "undefined") return []
-  const usuariosGuardados = localStorage.getItem(CLAVE_USUARIOS)
-  return usuariosGuardados ? JSON.parse(usuariosGuardados) : []
-}
-
-export function guardarUsuario(usuario: UsuarioGuardado): boolean {
-  const usuarios = obtenerUsuarios()
-  const existe = usuarios.some((u) => u.email === usuario.email)
-  if (existe) return false
-  usuarios.push(usuario)
-  localStorage.setItem(CLAVE_USUARIOS, JSON.stringify(usuarios))
-  return true
-}
-
-export function buscarUsuarioPorEmail(
-  email: string,
-): UsuarioGuardado | null {
-  const usuarios = obtenerUsuarios()
-  return usuarios.find((u) => u.email === email) || null
-}
-
-export function validarCredenciales(
-  email: string,
-  contraseña: string,
-): UsuarioGuardado | null {
-  const usuario = buscarUsuarioPorEmail(email)
-  if (usuario && usuario.contraseña === contraseña) {
-    return usuario
-  }
-  return null
-}
+export function obtenerUsuarios(): UsuarioGuardado[] { return [] }
+export function guardarUsuario(): boolean { return false }
+export function buscarUsuarioPorEmail(): UsuarioGuardado | null { return null }
+export function validarCredenciales(): UsuarioGuardado | null { return null }
 
 export function obtenerEstadoUsuario(usuarioId: string): EstadoGlobal | null {
   if (typeof window === "undefined") return null
   const clave = claveEstadoUsuario(usuarioId)
   const guardado = localStorage.getItem(clave)
-  if (guardado) {
-    try {
-      return JSON.parse(guardado) as EstadoGlobal
-    } catch {
-      return null
-    }
-  }
-  return null
+  return guardado ? (JSON.parse(guardado) as EstadoGlobal) : null
 }
 
 export function guardarEstadoUsuario(usuarioId: string, estado: EstadoGlobal): void {
